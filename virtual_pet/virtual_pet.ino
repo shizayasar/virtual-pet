@@ -1,6 +1,7 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <XPT2046_Touchscreen.h>
+#include "danny_sprites.h"
 
 // Touchscreen pins on the CYD
 #define TOUCH_IRQ  36
@@ -12,8 +13,15 @@
 SPIClass touchSPI(VSPI);
 XPT2046_Touchscreen ts(TOUCH_CS, TOUCH_IRQ);
 TFT_eSPI tft;
+TFT_eSprite petSprite = TFT_eSprite(&tft);   // off-screen buffer so Danny doesn't flicker
 
 const uint16_t BG = TFT_SKYBLUE;
+
+// Danny is drawn 3x bigger than the 48x48 sprite
+const int PET_SCALE = 3;
+const int PET_SIZE  = DANNY_W * PET_SCALE;    // 144
+const int PET_X     = (320 - PET_SIZE) / 2;   // centered
+const int PET_Y     = 28;
 
 // Pet stats: 100 = full, 0 = empty
 int hunger = 80;
@@ -34,9 +42,9 @@ bool wasTouched = false;
 
 struct Button { int x, y, w, h; const char* label; uint16_t color; };
 Button buttons[3] = {
-  {8,   192, 96, 40, "Feed",  TFT_ORANGE},
-  {112, 192, 96, 40, "Play",  TFT_DARKGREEN},
-  {216, 192, 96, 40, "Sleep", TFT_NAVY}
+  {8,   196, 96, 38, "Feed",  TFT_ORANGE},
+  {112, 196, 96, 38, "Play",  TFT_DARKGREEN},
+  {216, 196, 96, 38, "Sleep", TFT_NAVY}
 };
 
 enum Mood { HAPPY, OKAY, HUNGRY, TIRED, SAD, ASLEEP };
@@ -54,19 +62,21 @@ Mood getMood() {
 
 // ---------- Drawing ----------
 
-void drawBar(int y, const char* label, int value, uint16_t color) {
+// One compact stat: label on top, bar underneath
+void drawBar(int x, const char* label, int value, uint16_t color) {
   tft.setTextDatum(TL_DATUM);
   tft.setTextColor(TFT_BLACK, BG);
-  tft.drawString(label, 8, y, 2);
-  tft.drawRect(90, y + 2, 202, 12, TFT_BLACK);
-  tft.fillRect(91, y + 3, value * 2, 10, color);
-  tft.fillRect(91 + value * 2, y + 3, 200 - value * 2, 10, TFT_WHITE);
+  tft.drawString(label, x, 0, 2);
+  int fill = value * 98 / 100;
+  tft.drawRect(x, 17, 100, 9, TFT_BLACK);
+  tft.fillRect(x + 1, 18, fill, 7, color);
+  tft.fillRect(x + 1 + fill, 18, 98 - fill, 7, TFT_WHITE);
 }
 
 void drawStats() {
-  drawBar(6,  "Hunger", hunger, TFT_ORANGE);
-  drawBar(24, "Fun",    fun,    TFT_GREEN);
-  drawBar(42, "Energy", energy, TFT_BLUE);
+  drawBar(6,   "Hunger", hunger, TFT_ORANGE);
+  drawBar(110, "Fun",    fun,    TFT_GREEN);
+  drawBar(214, "Energy", energy, TFT_BLUE);
 }
 
 void drawButtons() {
@@ -81,43 +91,41 @@ void drawButtons() {
   tft.setTextDatum(TL_DATUM);
 }
 
+// Draws one 48x48 frame of Danny, scaled up, into the sprite buffer and then onto the screen
+void drawDanny(DannyFrame frame) {
+  const uint16_t* img = dannyFrames[frame];
+  petSprite.fillSprite(BG);
+  for (int y = 0; y < DANNY_H; y++) {
+    for (int x = 0; x < DANNY_W; x++) {
+      uint16_t c = pgm_read_word(&img[y * DANNY_W + x]);
+      if (c == DANNY_TRANSPARENT) continue;
+      petSprite.fillRect(x * PET_SCALE, y * PET_SCALE, PET_SCALE, PET_SCALE, c);
+    }
+  }
+  petSprite.pushSprite(PET_X, PET_Y);
+}
+
 void drawPet(Mood mood, bool blink) {
-  tft.fillRect(100, 66, 140, 118, BG);       // clear the pet area
-  tft.fillCircle(160, 120, 45, TFT_PINK);    // body
-
-  // Eyes
-  if (mood == ASLEEP || blink) {
-    tft.fillRect(136, 107, 14, 3, TFT_BLACK);
-    tft.fillRect(170, 107, 14, 3, TFT_BLACK);
-  } else if (mood == TIRED) {
-    tft.fillRect(137, 106, 12, 5, TFT_BLACK);
-    tft.fillRect(171, 106, 12, 5, TFT_BLACK);
+  DannyFrame frame;
+  if (blink && mood != ASLEEP) {
+    frame = DANNY_BLINK;
   } else {
-    tft.fillCircle(143, 108, 6, TFT_BLACK);
-    tft.fillCircle(177, 108, 6, TFT_BLACK);
+    switch (mood) {
+      case HAPPY:  frame = DANNY_HAPPY;  break;
+      case HUNGRY: frame = DANNY_HUNGRY; break;
+      case TIRED:  frame = DANNY_TIRED;  break;
+      case SAD:    frame = DANNY_SAD;    break;
+      case ASLEEP: frame = DANNY_ASLEEP; break;
+      default:     frame = DANNY_OKAY;   break;
+    }
   }
+  drawDanny(frame);
 
-  // Mouth
-  switch (mood) {
-    case HAPPY:   // smile
-      tft.fillCircle(160, 130, 14, TFT_BLACK);
-      tft.fillCircle(160, 124, 14, TFT_PINK);
-      break;
-    case SAD:     // frown
-      tft.fillCircle(160, 146, 12, TFT_BLACK);
-      tft.fillCircle(160, 151, 12, TFT_PINK);
-      break;
-    case HUNGRY:  // open mouth
-      tft.fillCircle(160, 138, 8, TFT_BLACK);
-      break;
-    default:      // flat mouth
-      tft.fillRect(150, 138, 20, 3, TFT_BLACK);
-      break;
-  }
-
+  // "Zz" next to Danny while he sleeps
+  tft.fillRect(PET_X + PET_SIZE + 2, PET_Y, 40, 30, BG);
   if (mood == ASLEEP) {
     tft.setTextColor(TFT_BLACK, BG);
-    tft.drawString("Zz", 205, 70, 4);
+    tft.drawString("Zz", PET_X + PET_SIZE + 4, PET_Y + 4, 4);
   }
 }
 
@@ -189,6 +197,8 @@ void setup() {
   tft.init();
   tft.setRotation(1);
   tft.fillScreen(BG);
+
+  petSprite.createSprite(PET_SIZE, PET_SIZE);
 
   randomSeed(analogRead(34));
   drawStats();
