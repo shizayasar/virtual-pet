@@ -2,6 +2,8 @@
 
 A pocket virtual pet that reacts to light, touch, and motion. Built in C++ on an ESP32 with a custom 3D-printed shell.
 
+![First working display](images/display-test.jpg)
+
 Work in progress. Right now I'm getting the display running and building the basic pet logic.
 
 ## Hardware
