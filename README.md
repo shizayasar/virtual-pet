@@ -4,9 +4,15 @@ A pocket virtual pet that reacts to light, touch, and motion. Built in C++ on an
 
 The pet is Danny, a fluffy tabby cat drawn in pixel art.
 
-Work in progress. The display, touch controls, and basic pet logic are working. Right now I'm drawing Danny's sprites for each mood.
+Work in progress. The display, touch controls, and basic pet logic are working, and Danny is on screen. Right now I'm drawing his sprites for the rest of his moods.
 
 ## Progress
+
+### Danny on screen
+
+Replaced the placeholder circle with Danny's pixel-art sprite. Only his neutral face is finished so far, so the other moods still use it for now.
+
+![Danny on screen](images/danny-on-screen.jpg)
 
 ### Stats, moods, and touch buttons
 
