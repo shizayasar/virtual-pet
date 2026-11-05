@@ -2,9 +2,21 @@
 
 A pocket virtual pet that reacts to light, touch, and motion. Built in C++ on an ESP32 with a custom 3D-printed shell.
 
-![First working display](images/display-test.jpg)
+The pet is Danny, a fluffy tabby cat drawn in pixel art.
 
-Work in progress. Right now I'm getting the display running and building the basic pet logic.
+Work in progress. The display, touch controls, and basic pet logic are working. Right now I'm drawing Danny's sprites for each mood.
+
+## Progress
+
+### Stats, moods, and touch buttons
+
+Danny has hunger, fun, and energy stats that drop over time. You can feed him, play with him, or put him to sleep using the buttons on the touchscreen, and his mood changes based on his stats.
+
+https://github.com/user-attachments/assets/03c6d61e-519e-468a-8375-0ab2ed8aa140
+
+### First working display
+
+![First working display](images/display-test.jpg)
 
 ## Hardware
 
@@ -17,13 +29,14 @@ Work in progress. Right now I'm getting the display running and building the bas
 
 ## Setup
 
-Built with the Arduino IDE using the ESP32 board package and the TFT_eSPI library.
+Built with the Arduino IDE using the ESP32 board package, the TFT_eSPI library for the display, and the XPT2046_Touchscreen library for touch.
 
 ## To do
 
-- [ ] Get the display working
-- [ ] Pet stats and moods
-- [ ] Draw sprites
+- [x] Get the display working
+- [x] Touch input
+- [x] Pet stats and moods
+- [ ] Draw sprites for every mood
 - [ ] Sleep mode using the light sensor
 - [ ] Buttons and shake to play
 - [ ] Sound
