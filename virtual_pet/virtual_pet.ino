@@ -1,4 +1,5 @@
 #include <SPI.h>
+#include <Wire.h>
 #include <TFT_eSPI.h>
 #include <XPT2046_Touchscreen.h>
 #include "danny_sprites.h"
@@ -57,12 +58,14 @@ Button buttons[3] = {
   {216, 196, 96, 38, "Sleep", TFT_NAVY}
 };
 
-enum Mood { HAPPY, OKAY, HUNGRY, TIRED, SAD, ASLEEP };
+enum Mood { HAPPY, OKAY, HUNGRY, TIRED, SAD, ASLEEP, DIZZY };
+unsigned long dizzyUntil = 0;   // Danny stays dizzy until this time
 int shownMood = -1;
 bool shownBlink = false;
 
 Mood getMood() {
   if (sleeping)    return ASLEEP;
+  if (millis() < dizzyUntil) return DIZZY;
   if (hunger < 25) return HUNGRY;
   if (energy < 25) return TIRED;
   if (fun < 25)    return SAD;
@@ -117,7 +120,7 @@ void drawDanny(DannyFrame frame) {
 
 void drawPet(Mood mood, bool blink) {
   DannyFrame frame;
-  if (blink && mood != ASLEEP) {
+  if (blink && mood != ASLEEP && mood != DIZZY) {
     frame = DANNY_BLINK;
   } else {
     switch (mood) {
@@ -126,6 +129,7 @@ void drawPet(Mood mood, bool blink) {
       case TIRED:  frame = DANNY_TIRED;  break;
       case SAD:    frame = DANNY_SAD;    break;
       case ASLEEP: frame = DANNY_ASLEEP; break;
+      case DIZZY:  frame = DANNY_DIZZY;  break;
       default:     frame = DANNY_OKAY;   break;
     }
   }
@@ -185,6 +189,82 @@ void tick() {
   drawStats();
 }
 
+// ---------- Shake to play (MPU-6050 accelerometer on CN1) ----------
+
+#define I2C_SDA 22
+#define I2C_SCL 27
+#define MPU_ADDR 0x68
+
+const long SHAKE_FORCE = 9000;            // how hard a jolt has to be (16384 = 1g)
+const long HARD_SHAKE_FORCE = 22000;      // shakes harder than this make Danny dizzy
+const unsigned long DIZZY_MS = 3000;      // how long he stays dizzy
+const int SHAKES_NEEDED = 3;              // jolts in a row that count as a shake
+const unsigned long SHAKE_WINDOW_MS = 800;
+const unsigned long SHAKE_COOLDOWN_MS = 1500;
+
+bool mpuFound = false;
+int shakeCount = 0;
+unsigned long firstShakeAt = 0;
+unsigned long lastShakeAt = 0;
+unsigned long lastMpuRead = 0;
+bool wasJolted = false;
+long shakePeak = 0;                       // strongest jolt in the current shake
+
+void setupAccelerometer() {
+  Wire.begin(I2C_SDA, I2C_SCL);
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x6B);   // power register
+  Wire.write(0);      // wake the MPU-6050 up
+  mpuFound = (Wire.endTransmission() == 0);   // if it's unplugged, the rest of the pet still works
+}
+
+// Returns how far the total acceleration is from normal gravity
+long readJolt() {
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x3B);   // first acceleration register
+  if (Wire.endTransmission(false) != 0) return 0;
+  if (Wire.requestFrom((uint8_t)MPU_ADDR, (uint8_t)6) != 6) return 0;
+  int16_t ax = (Wire.read() << 8) | Wire.read();
+  int16_t ay = (Wire.read() << 8) | Wire.read();
+  int16_t az = (Wire.read() << 8) | Wire.read();
+  float total = sqrt((float)ax * ax + (float)ay * ay + (float)az * az);
+  return labs((long)total - 16384);
+}
+
+void checkShake(unsigned long now) {
+  if (!mpuFound || now - lastMpuRead < 20) return;
+  lastMpuRead = now;
+
+  long jolt = readJolt();
+  bool jolted = jolt > SHAKE_FORCE;
+  if (jolted) shakePeak = max(shakePeak, jolt);
+  if (jolted && !wasJolted) {                 // count each jolt once
+    if (now - firstShakeAt > SHAKE_WINDOW_MS) {
+      shakeCount = 0;
+      shakePeak = jolt;
+      firstShakeAt = now;
+    }
+    shakeCount++;
+    if (shakeCount >= SHAKES_NEEDED && now - lastShakeAt > SHAKE_COOLDOWN_MS) {
+      lastShakeAt = now;
+      shakeCount = 0;
+      Serial.printf("Shake strength: %ld\n", shakePeak);
+      if (sleeping) {
+        // shaking doesn't do anything while he's asleep
+      } else if (shakePeak > HARD_SHAKE_FORCE) {   // hard shake: dizzy
+        dizzyUntil = now + DIZZY_MS;
+        fun -= 5;
+        energy -= 5;
+        clampStats();
+        drawStats();
+      } else {                                // gentle shake: same as tapping Play
+        pressButton(1);
+      }
+    }
+  }
+  wasJolted = jolted;
+}
+
 void handleTouch() {
   bool touched = ts.tirqTouched() && ts.touched();
   if (touched && !wasTouched) {          // only react to a new tap
@@ -226,6 +306,7 @@ void checkLight(unsigned long now) {
 // ---------- Setup and loop ----------
 
 void setup() {
+  Serial.begin(115200);   // prints shake strength so the thresholds can be tuned
   touchSPI.begin(TOUCH_CLK, TOUCH_MISO, TOUCH_MOSI, TOUCH_CS);
   ts.begin(touchSPI);
   ts.setRotation(1);
@@ -235,6 +316,7 @@ void setup() {
   tft.fillScreen(BG);
 
   petSprite.createSprite(PET_SIZE, PET_SIZE);
+  setupAccelerometer();
 
   analogSetAttenuation(ADC_0db);  // makes the light sensor more sensitive
   randomSeed(analogRead(LIGHT_PIN));
@@ -264,5 +346,6 @@ void loop() {
   }
 
   checkLight(now);
+  checkShake(now);
   handleTouch();
 }
