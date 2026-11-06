@@ -8,6 +8,12 @@ Work in progress. The display, touch controls, and basic pet logic are working, 
 
 ## Progress
 
+### All of Danny's moods
+
+Danny now has his own face for every mood: happy, okay, hungry, tired, sad, and asleep, and he blinks every few seconds.
+
+https://github.com/user-attachments/assets/103a85be-bb7f-4663-baca-28e2d0b830b6
+
 ### Danny on screen
 
 Replaced the placeholder circle with Danny's pixel-art sprite. Only his neutral face is finished so far, so the other moods still use it for now.
@@ -42,7 +48,7 @@ Built with the Arduino IDE using the ESP32 board package, the TFT_eSPI library f
 - [x] Get the display working
 - [x] Touch input
 - [x] Pet stats and moods
-- [ ] Draw sprites for every mood
+- [x] Draw sprites for every mood
 - [ ] Sleep mode using the light sensor
 - [ ] Buttons and shake to play
 - [ ] Sound
