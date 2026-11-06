@@ -8,6 +8,12 @@ Work in progress. Danny has his own face for every mood, reacts to touch, and fa
 
 ## Progress
 
+### Shake to play
+
+Danny now reacts to motion using an MPU-6050 accelerometer. A gentle shake plays with him and makes him happier, but shake him too hard and he gets dizzy for a few seconds.
+
+https://github.com/user-attachments/assets/a0f8d460-bec1-4a83-8c1a-839e7890bdde
+
 ### Sleep mode using the light sensor
 
 Danny now falls asleep on his own when the room gets dark and wakes up when the lights come back on, using the light sensor built into the board. The room has to stay dark (or lit) for 3 seconds before he reacts, so a passing shadow won't wake him or put him to sleep. The Sleep and Wake buttons still work too: if you wake him up in the dark, he stays awake until the lights go on and off again.
@@ -56,7 +62,8 @@ Built with the Arduino IDE using the ESP32 board package, the TFT_eSPI library f
 - [x] Pet stats and moods
 - [x] Draw sprites for every mood
 - [x] Sleep mode using the light sensor
-- [ ] Buttons and shake to play
+- [x] Shake to play
+- [ ] Buttons
 - [ ] Sound
 - [ ] Battery power
 - [ ] Case
