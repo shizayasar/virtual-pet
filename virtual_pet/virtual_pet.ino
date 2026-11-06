@@ -28,6 +28,16 @@ int hunger = 80;
 int fun = 80;
 int energy = 80;
 bool sleeping = false;
+bool sleptFromDark = false;      // true when the dark room put him to sleep
+
+// Light sensor built into the CYD. Higher number = darker room.
+#define LIGHT_PIN 34
+const int DARK_LEVEL  = 300;     // above this, the room counts as dark
+const int LIGHT_LEVEL = 100;     // below this, the room counts as lit again
+const unsigned long LIGHT_CHANGE_MS = 3000;   // has to stay dark or lit this long
+bool roomDark = false;
+unsigned long lightChangeSince = 0;
+unsigned long lastLightCheck = 0;
 
 // Stats drop every 5 seconds (short for testing, make it longer later)
 const unsigned long TICK_MS = 5000;
@@ -137,10 +147,15 @@ void clampStats() {
   energy = constrain(energy, 0, 100);
 }
 
+void setSleeping(bool s) {
+  sleeping = s;
+  if (!s) sleptFromDark = false;
+  drawButtons();
+}
+
 void pressButton(int i) {
   if (i == 2) {                  // Sleep / Wake
-    sleeping = !sleeping;
-    drawButtons();
+    setSleeping(!sleeping);
   } else if (sleeping) {
     return;                      // can't feed or play while asleep
   } else if (i == 0) {           // Feed
@@ -158,9 +173,8 @@ void tick() {
   if (sleeping) {
     energy += 5;
     hunger -= 1;
-    if (energy >= 100) {         // wakes up when fully rested
-      sleeping = false;
-      drawButtons();
+    if (energy >= 100 && !sleptFromDark) {   // wakes up when fully rested (unless it's still dark)
+      setSleeping(false);
     }
   } else {
     hunger -= 2;
@@ -187,6 +201,28 @@ void handleTouch() {
   wasTouched = touched;
 }
 
+// Danny falls asleep when the room gets dark and wakes up when the lights come back on
+void checkLight(unsigned long now) {
+  if (now - lastLightCheck < 200) return;
+  lastLightCheck = now;
+
+  int light = analogRead(LIGHT_PIN);
+  bool looksDark = roomDark ? (light > LIGHT_LEVEL) : (light > DARK_LEVEL);
+  if (looksDark == roomDark) {   // nothing changed
+    lightChangeSince = now;
+    return;
+  }
+  if (now - lightChangeSince < LIGHT_CHANGE_MS) return;   // wait until it's been dark/lit for a bit
+
+  roomDark = looksDark;
+  if (roomDark && !sleeping) {
+    setSleeping(true);
+    sleptFromDark = true;
+  } else if (!roomDark && sleeping && sleptFromDark) {
+    setSleeping(false);
+  }
+}
+
 // ---------- Setup and loop ----------
 
 void setup() {
@@ -200,7 +236,8 @@ void setup() {
 
   petSprite.createSprite(PET_SIZE, PET_SIZE);
 
-  randomSeed(analogRead(34));
+  analogSetAttenuation(ADC_0db);  // makes the light sensor more sensitive
+  randomSeed(analogRead(LIGHT_PIN));
   drawStats();
   drawButtons();
 }
@@ -226,5 +263,6 @@ void loop() {
     shownBlink = blinking;
   }
 
+  checkLight(now);
   handleTouch();
 }
