@@ -4,9 +4,15 @@ A pocket virtual pet that reacts to light, touch, and motion. Built in C++ on an
 
 The pet is Danny, a fluffy tabby cat drawn in pixel art.
 
-Work in progress. The display, touch controls, and basic pet logic are working, and Danny is on screen. Right now I'm drawing his sprites for the rest of his moods.
+Work in progress. Danny has his own face for every mood, reacts to touch, and falls asleep when the room gets dark. Next up is adding physical buttons and shake to play.
 
 ## Progress
+
+### Sleep mode using the light sensor
+
+Danny now falls asleep on his own when the room gets dark and wakes up when the lights come back on, using the light sensor built into the board. The room has to stay dark (or lit) for 3 seconds before he reacts, so a passing shadow won't wake him or put him to sleep. The Sleep and Wake buttons still work too: if you wake him up in the dark, he stays awake until the lights go on and off again.
+
+https://github.com/user-attachments/assets/3fa5249c-69ae-496c-986d-d7fa691413f8
 
 ### All of Danny's moods
 
@@ -49,7 +55,7 @@ Built with the Arduino IDE using the ESP32 board package, the TFT_eSPI library f
 - [x] Touch input
 - [x] Pet stats and moods
 - [x] Draw sprites for every mood
-- [ ] Sleep mode using the light sensor
+- [x] Sleep mode using the light sensor
 - [ ] Buttons and shake to play
 - [ ] Sound
 - [ ] Battery power
